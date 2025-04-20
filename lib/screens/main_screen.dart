@@ -22,6 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLoading = false;
   bool _showKML = false;
   bool _isListening = false;
+  bool _isVisualizing = false;
 
   @override
   void initState() {
@@ -32,6 +33,61 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _initializeVoiceInput() async {
     await _voiceInputService.initialize();
   }
+
+  void _visualizeKML() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+
+    if (!appState.isConnectedToLG) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Not connected to Liquid Galaxy. Please connect in Settings.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isVisualizing = true;
+    });
+
+    try {
+      final success = await appState.sendKmlToLG(_response);
+
+      setState(() {
+        _isVisualizing = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('KML visualization sent to Liquid Galaxy'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _ttsService.speak("Visualization sent to Liquid Galaxy.");
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send visualization to Liquid Galaxy'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isVisualizing = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
 
   @override
   void dispose() {
@@ -81,11 +137,6 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Add this method for visualizing the KML
-  void _visualizeKML() {
-    // This will be implemented later
-    // For now, this is just a placeholder
-  }
 
   Future<void> _startVoiceInput() async {
     setState(() {
@@ -224,9 +275,18 @@ class _MainScreenState extends State<MainScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _visualizeKML,
-                          icon: const Icon(Icons.public),
-                          label: const Text('Visualize on Liquid Galaxy'),
+                          onPressed: _isVisualizing ? null : _visualizeKML,
+                          icon: _isVisualizing
+                              ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              strokeWidth: 2,
+                            ),
+                          )
+                              : const Icon(Icons.public),
+                          label: Text(_isVisualizing ? 'Sending to Liquid Galaxy...' : 'Visualize on Liquid Galaxy'),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(

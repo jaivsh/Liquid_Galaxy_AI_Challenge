@@ -14,6 +14,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _apiKeyController;
   late TextEditingController _lgIpController;
   late TextEditingController _lgPortController;
+  late TextEditingController _lgUsernameController;
+  late TextEditingController _lgPasswordController;
+  late TextEditingController _lgRigsController;
+
+  bool _isConnecting = false;
 
   @override
   void initState() {
@@ -22,6 +27,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _apiKeyController = TextEditingController(text: appState.apiKey);
     _lgIpController = TextEditingController(text: appState.lgIP);
     _lgPortController = TextEditingController(text: appState.lgPort.toString());
+    _lgUsernameController = TextEditingController(text: appState.lgUsername);
+    _lgPasswordController = TextEditingController(text: appState.lgPassword);
+    _lgRigsController = TextEditingController(text: appState.lgRigs.toString());
   }
 
   @override
@@ -29,7 +37,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _apiKeyController.dispose();
     _lgIpController.dispose();
     _lgPortController.dispose();
+    _lgUsernameController.dispose();
+    _lgPasswordController.dispose();
+    _lgRigsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _attemptConnection() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    // Save the form data first
+    _formKey.currentState!.save();
+
+    setState(() {
+      _isConnecting = true;
+    });
+
+    final appState = Provider.of<AppState>(context, listen: false);
+    final success = await appState.connectToLG();
+
+    setState(() {
+      _isConnecting = false;
+    });
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success
+            ? 'Connected to Liquid Galaxy successfully'
+            : 'Failed to connect to Liquid Galaxy'),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   @override
@@ -39,6 +81,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
+        actions: [
+          if (appState.isConnectedToLG)
+            Icon(
+              Icons.check_circle,
+              color: Colors.green,
+            ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -90,6 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 labelText: 'Liquid Galaxy IP Address',
                 hintText: 'E.g., 192.168.1.100',
                 border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.computer),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -112,9 +162,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextFormField(
               controller: _lgPortController,
               decoration: const InputDecoration(
-                labelText: 'Liquid Galaxy Port',
-                hintText: 'E.g., 8080',
+                labelText: 'SSH Port',
+                hintText: 'E.g., 22',
                 border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.settings_ethernet),
               ),
               keyboardType: TextInputType.number,
               validator: (value) {
@@ -134,6 +185,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 16),
+            TextFormField(
+              controller: _lgUsernameController,
+              decoration: const InputDecoration(
+                labelText: 'Username',
+                hintText: 'E.g., lg',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a username';
+                }
+                return null;
+              },
+              onSaved: (value) {
+                if (value != null) {
+                  appState.setLgUsername(value);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _lgPasswordController,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                hintText: 'Enter your password',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+              obscureText: true,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a password';
+                }
+                return null;
+              },
+              onSaved: (value) {
+                if (value != null) {
+                  appState.setLgPassword(value);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _lgRigsController,
+              decoration: const InputDecoration(
+                labelText: 'Number of Rigs',
+                hintText: 'E.g., 3',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.memory),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter number of rigs';
+                }
+                final rigs = int.tryParse(value);
+                if (rigs == null || rigs <= 0) {
+                  return 'Please enter a valid number of rigs';
+                }
+                return null;
+              },
+              onSaved: (value) {
+                if (value != null) {
+                  appState.setLgRigs(int.parse(value));
+                }
+              },
+            ),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
                 if (_formKey.currentState!.validate()) {
@@ -146,22 +266,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text('Save Settings'),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: appState.isConnectedToLG
+            ElevatedButton.icon(
+              onPressed: _isConnecting || appState.isConnectedToLG
                   ? appState.disconnectFromLG
-                  : appState.connectToLG,
+                  : _attemptConnection,
               style: ElevatedButton.styleFrom(
                 backgroundColor: appState.isConnectedToLG
                     ? Colors.red
                     : Colors.green,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: Text(
+              icon: Icon(
+                appState.isConnectedToLG ? Icons.link_off : Icons.link,
+              ),
+              label: _isConnecting
+                  ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text('Connecting...'),
+                ],
+              )
+                  : Text(
                 appState.isConnectedToLG
                     ? 'Disconnect from Liquid Galaxy'
                     : 'Connect to Liquid Galaxy',
               ),
             ),
+            if (appState.isConnectedToLG) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Connected to Liquid Galaxy at ${appState.lgIP}',
+                        style: TextStyle(color: Colors.green),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

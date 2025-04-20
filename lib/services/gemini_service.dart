@@ -12,7 +12,7 @@ class GeminiKMLService {
     );
   }
 
-  /// Generic content generation
+
   Future<String> generateContent(String prompt) async {
     try {
       final content = [Content.text(prompt)];
@@ -23,7 +23,7 @@ class GeminiKMLService {
     }
   }
 
-  /// Directly generate KML from a raw user query
+
   Future<String> generateKMLFromUserQuery(String userQuery) async {
 
 
@@ -54,7 +54,7 @@ Your primary goal is to produce a rich, immersive, and visually stunning <gx:Tou
       - `<Point><coordinates>longitude,latitude,0</coordinates></Point>`.  
       - `<styleUrl>` referencing a shared `<BalloonStyle>` that:  
         * Controls text size, fonts, background colors.  
-        * Embeds one HTML `<img src="…">` (≈200×200 px).  
+        * Does not embed any image in description balloon.
         * Can include `<Link>`s or `<p>` tags for structure.  
 
 4.  **Cinematic Camera Choreography**  
@@ -111,15 +111,15 @@ User query: "$userQuery"
 
       final kmlRegex = RegExp(r'(<kml[\s\S]*?</kml>)');
       final match = kmlRegex.firstMatch(cleaned);
-
       return match?.group(0)?.trim() ?? cleaned.trim();
+
     } catch (e) {
       print('Error generating KML: $e');
       return '<kml></kml>';
     }
   }
 
-  /// Cleans markdown/code block formatting if Gemini adds it
+
   String _stripCodeBlockFormatting(String text) {
     return text.replaceAll(RegExp(r'```[a-zA-Z]*'), '').trim();
   }
